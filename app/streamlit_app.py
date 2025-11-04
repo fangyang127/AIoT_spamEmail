@@ -283,11 +283,42 @@ def main():
             st.error("No model available. Run training first.")
         else:
             pred = model.predict([text])[0]
-            prob = model.predict_proba([text])[0][1] if hasattr(model, "predict_proba") else None
+            prob = None
+            try:
+                if hasattr(model, "predict_proba"):
+                    prob = float(model.predict_proba([text])[0][1])
+            except Exception:
+                prob = None
+
             label = "spam" if int(pred) == 1 else "ham"
-            st.markdown(f"**Prediction:** {label}")
+
+            # Colored display: spam -> red, ham -> green
+            if label == "spam":
+                st.error(f"Prediction: {label}")
+            else:
+                st.success(f"Prediction: {label}")
+
+            # Show spam probability as metric + horizontal bar chart when available
             if prob is not None:
-                st.write(f"Spam probability: {prob:.3f}")
+                try:
+                    # numeric display
+                    st.metric("Spam probability", f"{prob:.2%}")
+
+                    # small horizontal bar chart
+                    fig_prob, ax_prob = plt.subplots(figsize=(6, 0.5))
+                    bar_color = "#d62728"  # use red for the probability bar
+                    ax_prob.barh([0], [prob], color=bar_color)
+                    ax_prob.set_xlim(0, 1)
+                    ax_prob.set_yticks([])
+                    ax_prob.set_xlabel("Spam probability")
+                    # annotate value on bar
+                    ax_prob.text(prob + 0.01 if prob < 0.95 else prob - 0.05, 0, f"{prob:.2%}", va="center")
+                    plt.tight_layout()
+                    st.pyplot(fig_prob)
+                except Exception as e:
+                    st.info(f"Unable to render probability chart: {e}")
+            else:
+                st.info("Spam probability not available for this model.")
 
     st.markdown("---")
 
