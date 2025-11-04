@@ -310,68 +310,68 @@ def main():
             except Exception:
                 probs = None
 
-                # Confusion / ROC / PR: show three small plots side-by-side
-                if probs is not None:
-                    y_pred = (probs >= threshold).astype(int)
-                    img_c1, img_c2, img_c3 = st.columns(3)
+            # Confusion / ROC / PR: show three small plots side-by-side
+            if probs is not None:
+                y_pred = (probs >= threshold).astype(int)
+                img_c1, img_c2, img_c3 = st.columns(3)
 
-                    with img_c1:
-                        fig_cm, ax_cm = plt.subplots(figsize=(3, 3))
-                        plot_confusion_matrix_ax(y_true, y_pred, ax_cm)
-                        st.subheader("Confusion")
-                        st.pyplot(fig_cm)
+                with img_c1:
+                    fig_cm, ax_cm = plt.subplots(figsize=(3, 3))
+                    plot_confusion_matrix_ax(y_true, y_pred, ax_cm)
+                    st.subheader("Confusion")
+                    st.pyplot(fig_cm)
 
-                    with img_c2:
-                        fig_roc, ax_roc = plt.subplots(figsize=(3, 3))
-                        plot_roc_ax(model, messages, y_true, ax_roc)
-                        st.subheader("ROC")
-                        st.pyplot(fig_roc)
+                with img_c2:
+                    fig_roc, ax_roc = plt.subplots(figsize=(3, 3))
+                    plot_roc_ax(model, messages, y_true, ax_roc)
+                    st.subheader("ROC")
+                    st.pyplot(fig_roc)
 
-                    with img_c3:
-                        fig_pr, ax_pr = plt.subplots(figsize=(3, 3))
-                        plot_precision_recall_ax(model, messages, y_true, ax_pr)
-                        st.subheader("Precision-Recall")
-                        st.pyplot(fig_pr)
+                with img_c3:
+                    fig_pr, ax_pr = plt.subplots(figsize=(3, 3))
+                    plot_precision_recall_ax(model, messages, y_true, ax_pr)
+                    st.subheader("Precision-Recall")
+                    st.pyplot(fig_pr)
 
-                    # Present threshold sweep as a table (no plot)
+                # Present threshold sweep as a table (no plot)
+                try:
+                    import pandas as pd
+                    thresholds = np.linspace(0.0, 1.0, 101)
+                    precisions = []
+                    recalls = []
+                    f1s = []
+                    from sklearn.metrics import precision_score, recall_score, f1_score
+                    for t in thresholds:
+                        y_pred_t = (probs >= t).astype(int)
+                        precisions.append(precision_score(y_true, y_pred_t, zero_division=0))
+                        recalls.append(recall_score(y_true, y_pred_t, zero_division=0))
+                        f1s.append(f1_score(y_true, y_pred_t, zero_division=0))
+
+                    table_df = pd.DataFrame({
+                        "threshold": thresholds,
+                        "precision": precisions,
+                        "recall": recalls,
+                        "f1": f1s,
+                    })
+                    st.subheader("Threshold table(precision / recall / f1)")
                     try:
-                        import pandas as pd
-                        thresholds = np.linspace(0.0, 1.0, 101)
-                        precisions = []
-                        recalls = []
-                        f1s = []
-                        from sklearn.metrics import precision_score, recall_score, f1_score
-                        for t in thresholds:
-                            y_pred_t = (probs >= t).astype(int)
-                            precisions.append(precision_score(y_true, y_pred_t, zero_division=0))
-                            recalls.append(recall_score(y_true, y_pred_t, zero_division=0))
-                            f1s.append(f1_score(y_true, y_pred_t, zero_division=0))
+                        # show ~10 rows centered around the current slider threshold
+                        window = 10
+                        center_idx = int(round(threshold * 100))
+                        start = max(0, center_idx - window // 2)
+                        end = start + window
+                        # clamp end
+                        if end > len(table_df):
+                            end = len(table_df)
+                            start = max(0, end - window)
 
-                        table_df = pd.DataFrame({
-                            "threshold": thresholds,
-                            "precision": precisions,
-                            "recall": recalls,
-                            "f1": f1s,
-                        })
-                        st.subheader("Threshold table(precision / recall / f1)")
-                        try:
-                            # show ~10 rows centered around the current slider threshold
-                            window = 10
-                            center_idx = int(round(threshold * 100))
-                            start = max(0, center_idx - window // 2)
-                            end = start + window
-                            # clamp end
-                            if end > len(table_df):
-                                end = len(table_df)
-                                start = max(0, end - window)
-
-                            display_df = table_df.iloc[start:end].reset_index(drop=True)
-                            st.dataframe(display_df)
-                            st.caption(f"Showing rows {start}–{end-1} (thresholds {display_df['threshold'].iloc[0]:.2f}–{display_df['threshold'].iloc[-1]:.2f})")
-                        except Exception:
-                            st.dataframe(table_df.head(10))
+                        display_df = table_df.iloc[start:end].reset_index(drop=True)
+                        st.dataframe(display_df)
+                        st.caption(f"Showing rows {start}–{end-1} (thresholds {display_df['threshold'].iloc[0]:.2f}–{display_df['threshold'].iloc[-1]:.2f})")
                     except Exception:
-                        st.info("Unable to compute threshold table in this environment.")
+                        st.dataframe(table_df.head(10))
+                except Exception:
+                    st.info("Unable to compute threshold table in this environment.")
             else:
                 st.info("Model does not provide probabilities; showing saved images if available.")
                 show_image(CONF_MATRIX_PATH, "Confusion Matrix")
