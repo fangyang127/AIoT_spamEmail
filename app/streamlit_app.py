@@ -390,19 +390,36 @@ def main():
                         st.pyplot(fig_ts)
 
                         # also show nearby table rows for inspection
-                        st.subheader("Threshold table (near current threshold)")
+                        st.subheader("Threshold table (select range to display)")
                         try:
-                            window = 10
-                            center_idx = int(round(threshold * 100))
-                            start = max(0, center_idx - window // 2)
-                            end = start + window
-                            if end > len(table_df):
-                                end = len(table_df)
-                                start = max(0, end - window)
-                            display_df = table_df.iloc[start:end].reset_index(drop=True)
+                            # Allow user to choose how many rows to display (small window up to full table)
+                            # 101 rows corresponds to thresholds 0.00..1.00 at 0.01 steps
+                            table_rows = st.slider("Number of threshold rows to show", min_value=5, max_value=101, value=10, step=1)
+
+                            # If user requests the full table or a number >= available rows, show whole table
+                            total_rows = len(table_df)
+                            if table_rows >= total_rows:
+                                display_df = table_df.reset_index(drop=True)
+                                start = 0
+                                end = total_rows
+                            else:
+                                center_idx = int(round(threshold * 100))
+                                start = max(0, center_idx - table_rows // 2)
+                                end = start + table_rows
+                                if end > total_rows:
+                                    end = total_rows
+                                    start = max(0, end - table_rows)
+                                display_df = table_df.iloc[start:end].reset_index(drop=True)
+
                             st.dataframe(display_df)
-                            st.caption(f"Showing rows {start}–{end-1} (thresholds {display_df['threshold'].iloc[0]:.2f}–{display_df['threshold'].iloc[-1]:.2f})")
-                        except Exception:
+                            # friendly caption describing which thresholds are visible
+                            if len(display_df) > 0:
+                                st.caption(f"Showing rows {start}–{end-1} (thresholds {display_df['threshold'].iloc[0]:.2f}–{display_df['threshold'].iloc[-1]:.2f})")
+                            else:
+                                st.caption("No threshold rows to display.")
+                        except Exception as e:
+                            # fallback: show first 10 rows
+                            st.info(f"Unable to compute threshold table slice: {e}")
                             st.dataframe(table_df.head(10))
                     except Exception as e:
                         st.info(f"Unable to render threshold sweep plot: {e}")
