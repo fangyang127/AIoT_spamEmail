@@ -371,23 +371,41 @@ def main():
                         "recall": recalls,
                         "f1": f1s,
                     })
-                    st.subheader("Current Threshold Performance(precision / recall / f1)")
-                    try:
-                        # show ~10 rows centered around the current slider threshold
-                        window = 10
-                        center_idx = int(round(threshold * 100))
-                        start = max(0, center_idx - window // 2)
-                        end = start + window
-                        # clamp end
-                        if end > len(table_df):
-                            end = len(table_df)
-                            start = max(0, end - window)
 
-                        display_df = table_df.iloc[start:end].reset_index(drop=True)
-                        st.dataframe(display_df)
-                        st.caption(f"Showing rows {start}–{end-1} (thresholds {display_df['threshold'].iloc[0]:.2f}–{display_df['threshold'].iloc[-1]:.2f})")
-                    except Exception:
-                        st.dataframe(table_df.head(10))
+                    # Plot threshold sweep (precision / recall / f1)
+                    st.subheader("Threshold sweep (precision / recall / f1)")
+                    try:
+                        fig_ts, ax_ts = plt.subplots(figsize=(8, 3))
+                        ax_ts.plot(table_df["threshold"], table_df["precision"], label="Precision", color="#1f77b4")
+                        ax_ts.plot(table_df["threshold"], table_df["recall"], label="Recall", color="#ff7f0e")
+                        ax_ts.plot(table_df["threshold"], table_df["f1"], label="F1", color="#2ca02c")
+                        ax_ts.set_xlabel("Threshold")
+                        ax_ts.set_ylabel("Score")
+                        ax_ts.set_ylim(0.0, 1.05)
+                        ax_ts.grid(alpha=0.2)
+                        # mark current threshold
+                        ax_ts.axvline(threshold, color="gray", linestyle="--", linewidth=1)
+                        ax_ts.legend(loc="best")
+                        plt.tight_layout()
+                        st.pyplot(fig_ts)
+
+                        # also show nearby table rows for inspection
+                        st.subheader("Threshold table (near current threshold)")
+                        try:
+                            window = 10
+                            center_idx = int(round(threshold * 100))
+                            start = max(0, center_idx - window // 2)
+                            end = start + window
+                            if end > len(table_df):
+                                end = len(table_df)
+                                start = max(0, end - window)
+                            display_df = table_df.iloc[start:end].reset_index(drop=True)
+                            st.dataframe(display_df)
+                            st.caption(f"Showing rows {start}–{end-1} (thresholds {display_df['threshold'].iloc[0]:.2f}–{display_df['threshold'].iloc[-1]:.2f})")
+                        except Exception:
+                            st.dataframe(table_df.head(10))
+                    except Exception as e:
+                        st.info(f"Unable to render threshold sweep plot: {e}")
                 except Exception:
                     st.info("Unable to compute threshold table in this environment.")
             else:
