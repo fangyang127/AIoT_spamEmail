@@ -199,8 +199,45 @@ def main():
     # Layout: stacked sections top -> bottom
     # 1) Predict a message
     st.header("Predict a message")
-    text = st.text_area("Enter an SMS message to classify", "Free entry: claim your prize now")
+
+    # Prepare session state key for the input so buttons can programmatically set it
+    if "predict_text" not in st.session_state:
+        st.session_state["predict_text"] = "Free entry: claim your prize now"
+
+    # Try to load dataset examples (non-blocking)
+    try:
+        df_examples = load_data(download=False)
+    except Exception:
+        df_examples = None
+
+    # Determine example messages
+    spam_example = "Free entry: claim your prize now"
+    ham_example = "Hey, are we still on for tonight?"
+    try:
+        if df_examples is not None:
+            s = df_examples[df_examples["label"].str.lower() == "spam"]
+            h = df_examples[df_examples["label"].str.lower() == "ham"]
+            if not s.empty:
+                spam_example = s.sample(1)["message"].iloc[0]
+            if not h.empty:
+                ham_example = h.sample(1)["message"].iloc[0]
+    except Exception:
+        # keep defaults on failure
+        pass
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("Use spam example"):
+            st.session_state["predict_text"] = str(spam_example)
+    with col_b:
+        if st.button("Use ham example"):
+            st.session_state["predict_text"] = str(ham_example)
+
+    # text_area bound to session_state so button clicks update the value
+    st.text_area("Enter an SMS message to classify", key="predict_text")
+
     if st.button("Predict"):
+        text = st.session_state.get("predict_text", "")
         if model is None:
             st.error("No model available. Run training first.")
         else:
