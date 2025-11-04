@@ -1,8 +1,36 @@
-import streamlit as st
-from joblib import load
-import os
-import json
-from src.data_loader import load_data
+try:
+    import streamlit as st
+    from joblib import load
+    import os
+    import sys
+    import json
+
+    # Ensure repository root is on sys.path so `from src...` imports work on Streamlit Cloud
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+
+    from src.data_loader import load_data
+
+except Exception:
+    # Capture full traceback to files for easier debugging on Streamlit Cloud
+    import traceback
+
+    tb = traceback.format_exc()
+    try:
+        with open("/tmp/streamlit_import_error.log", "w", encoding="utf-8") as f:
+            f.write(tb)
+    except Exception:
+        pass
+    try:
+        # write next to the app file (may be visible in deploy logs)
+        root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        with open(os.path.join(root, "streamlit_import_error.log"), "w", encoding="utf-8") as f:
+            f.write(tb)
+    except Exception:
+        pass
+    # Re-raise so Streamlit shows the error and logs capture the details
+    raise
 
 MODEL_PATH = os.path.join("models", "model--logistic--v0.1.joblib")
 METRICS_PATH = os.path.join("models", "metrics.json")
