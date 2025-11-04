@@ -371,7 +371,7 @@ def main():
                         "recall": recalls,
                         "f1": f1s,
                     })
-                    st.subheader("Threshold table(precision / recall / f1)")
+                    st.subheader("Current Threshold Performance(precision / recall / f1)")
                     try:
                         # show ~10 rows centered around the current slider threshold
                         window = 10
