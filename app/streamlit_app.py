@@ -196,186 +196,190 @@ def main():
     metrics = load_metrics()
     metadata = load_metadata()
 
-    col1, col2, col3, col4 = st.columns([2, 2, 3, 3])
+    # Layout: stacked sections top -> bottom
+    # 1) Predict a message
+    st.header("Predict a message")
+    text = st.text_area("Enter an SMS message to classify", "Free entry: claim your prize now")
+    if st.button("Predict"):
+        if model is None:
+            st.error("No model available. Run training first.")
+        else:
+            pred = model.predict([text])[0]
+            prob = model.predict_proba([text])[0][1] if hasattr(model, "predict_proba") else None
+            label = "spam" if int(pred) == 1 else "ham"
+            st.markdown(f"**Prediction:** {label}")
+            if prob is not None:
+                st.write(f"Spam probability: {prob:.3f}")
 
-    with col1:
-        st.header("Predict a message")
-        text = st.text_area("Enter an SMS message to classify", "Free entry: claim your prize now")
-        if st.button("Predict"):
-            if model is None:
-                st.error("No model available. Run training first.")
-            else:
-                pred = model.predict([text])[0]
-                prob = model.predict_proba([text])[0][1] if hasattr(model, "predict_proba") else None
-                label = "spam" if int(pred) == 1 else "ham"
-                st.markdown(f"**Prediction:** {label}")
-                if prob is not None:
-                    st.write(f"Spam probability: {prob:.3f}")
-        # Model info removed per request — no metadata/metrics are shown here.
+    st.markdown("---")
 
-    with col2:
-        st.header("Dataset")
+    # 2) Dataset Overview
+    st.header("Dataset Overview")
+    try:
+        df = load_data(download=False)
+    except Exception:
+        df = None
+
+    if df is None:
+        st.info("Dataset not available locally. Run training to download it or place CSV in data/.")
+    else:
+        st.subheader("Dataset sample")
+        st.write(df.sample(min(sample_size, len(df))))
+
+        # Class distribution (counts + bar chart)
         try:
-            df = load_data(download=False)
+            st.subheader("Class distribution")
+            class_counts = df["label"].str.lower().value_counts()
+            st.write(class_counts.to_frame(name="count"))
+            st.bar_chart(class_counts)
+        except Exception:
+            st.info("Unable to compute class distribution.")
+
+    st.markdown("---")
+
+    # 3) Top Tokens by Class
+    st.header("Top Tokens by Class")
+    try:
+        df_tokens = df if 'df' in locals() and df is not None else load_data(download=False)
+    except Exception:
+        df_tokens = None
+
+    if df_tokens is None:
+        st.info("Top tokens require the dataset. Run training or provide data/CSV.")
+    else:
+        try:
+            from src.preprocessing import build_vectorizer
+            import numpy as _np
+            import pandas as _pd
+
+            vec = build_vectorizer()
+            X = vec.fit_transform(df_tokens["message"].astype(str).values)
+            feature_names = _np.array(vec.get_feature_names_out())
+            labels = df_tokens["label"].str.lower().values
+
+            def top_tokens_for_class(class_name, top_n=10):
+                mask = labels == class_name
+                if mask.sum() == 0:
+                    return []
+                Xc = X[mask]
+                scores = _np.asarray(Xc.sum(axis=0)).ravel()
+                top_idx = scores.argsort()[::-1][:top_n]
+                return list(zip(feature_names[top_idx], scores[top_idx]))
+
+            spam_top = top_tokens_for_class("spam", top_n=10)
+            ham_top = top_tokens_for_class("ham", top_n=10)
+
+            if spam_top:
+                df_spam = _pd.DataFrame(spam_top, columns=["token", "score"])
+                st.subheader("Spam — top tokens")
+                st.table(df_spam)
+            else:
+                st.info("No spam examples in dataset.")
+
+            if ham_top:
+                df_ham = _pd.DataFrame(ham_top, columns=["token", "score"])
+                st.subheader("Ham — top tokens")
+                st.table(df_ham)
+            else:
+                st.info("No ham examples in dataset.")
+        except Exception as e:
+            st.info(f"Unable to compute top tokens: {e}")
+
+    st.markdown("---")
+
+    # 4) Model Performance
+    st.header("Model Performance")
+    if model is None:
+        st.info("No trained model available. Run training first to view performance plots.")
+    else:
+        # Try to compute on whole dataset if available
+        try:
+            df = df if 'df' in locals() and df is not None else load_data(download=False)
         except Exception:
             df = None
 
         if df is None:
-            st.info("Dataset not available locally. Run training to download it or place CSV in data/.")
+            st.info("Dataset not available locally to compute live performance. Saved images (if any) are shown below.")
+            show_image(CONF_MATRIX_PATH, "Confusion Matrix")
+            show_image(ROC_PATH, "ROC Curve")
         else:
-            st.subheader("Dataset sample")
-            st.write(df.sample(min(sample_size, len(df))))
-            # Class distribution (counts + bar chart)
+            messages = df["message"].astype(str).values
+            y_true = (df["label"].str.lower() == "spam").astype(int).values
             try:
-                st.subheader("Class distribution")
-                class_counts = df["label"].str.lower().value_counts()
-                st.write(class_counts.to_frame(name="count"))
-                st.bar_chart(class_counts)
+                probs = model.predict_proba(messages)[:, 1]
             except Exception:
-                st.info("Unable to compute class distribution.")
+                probs = None
 
-    with col3:
-        st.header("Model Performance")
-        if model is None:
-            st.info("No trained model available. Run training first to view performance plots.")
-        else:
-            # Try to compute on whole dataset if available
-            try:
-                df = df if 'df' in locals() and df is not None else load_data(download=False)
-            except Exception:
-                df = None
+            # Confusion matrix at current threshold
+            if probs is not None:
+                y_pred = (probs >= threshold).astype(int)
+                fig_cm, ax_cm = plt.subplots(figsize=(4, 4))
+                plot_confusion_matrix_ax(y_true, y_pred, ax_cm)
+                st.subheader("Confusion Matrix (current threshold)")
+                st.pyplot(fig_cm)
 
-            if df is None:
-                st.info("Dataset not available locally to compute live performance. Saved images (if any) are shown below.")
+                # ROC
+                fig_roc, ax_roc = plt.subplots(figsize=(5, 4))
+                plot_roc_ax(model, messages, y_true, ax_roc)
+                st.subheader("ROC Curve")
+                st.pyplot(fig_roc)
+
+                # Precision-Recall curve
+                fig_pr, ax_pr = plt.subplots(figsize=(5, 4))
+                plot_precision_recall_ax(model, messages, y_true, ax_pr)
+                st.subheader("Precision-Recall Curve")
+                st.pyplot(fig_pr)
+
+                # Threshold sweep
+                fig_ts, ax_ts = plt.subplots(figsize=(6, 3))
+                plot_threshold_sweep_ax(probs, y_true, ax_ts)
+                st.subheader("Threshold sweep (precision / recall / f1)")
+                st.pyplot(fig_ts)
+                # Also present threshold sweep as a table
+                try:
+                    import pandas as pd
+                    thresholds = np.linspace(0.0, 1.0, 101)
+                    precisions = []
+                    recalls = []
+                    f1s = []
+                    from sklearn.metrics import precision_score, recall_score, f1_score
+                    for t in thresholds:
+                        y_pred_t = (probs >= t).astype(int)
+                        precisions.append(precision_score(y_true, y_pred_t, zero_division=0))
+                        recalls.append(recall_score(y_true, y_pred_t, zero_division=0))
+                        f1s.append(f1_score(y_true, y_pred_t, zero_division=0))
+
+                    table_df = pd.DataFrame({
+                        "threshold": thresholds,
+                        "precision": precisions,
+                        "recall": recalls,
+                        "f1": f1s,
+                    })
+                    st.subheader("Threshold table (showing ~10 rows around current threshold)")
+                    try:
+                        # show ~10 rows centered around the current slider threshold
+                        import math
+
+                        window = 10
+                        center_idx = int(round(threshold * 100))
+                        start = max(0, center_idx - window // 2)
+                        end = start + window
+                        # clamp end
+                        if end > len(table_df):
+                            end = len(table_df)
+                            start = max(0, end - window)
+
+                        display_df = table_df.iloc[start:end].reset_index(drop=True)
+                        st.dataframe(display_df)
+                        st.caption(f"Showing rows {start}–{end-1} (thresholds {display_df['threshold'].iloc[0]:.2f}–{display_df['threshold'].iloc[-1]:.2f})")
+                    except Exception:
+                        st.dataframe(table_df.head(10))
+                except Exception:
+                    st.info("Unable to compute threshold table in this environment.")
+            else:
+                st.info("Model does not provide probabilities; showing saved images if available.")
                 show_image(CONF_MATRIX_PATH, "Confusion Matrix")
                 show_image(ROC_PATH, "ROC Curve")
-            else:
-                messages = df["message"].astype(str).values
-                y_true = (df["label"].str.lower() == "spam").astype(int).values
-                try:
-                    probs = model.predict_proba(messages)[:, 1]
-                except Exception:
-                    probs = None
-
-                # Confusion matrix at current threshold
-                if probs is not None:
-                    y_pred = (probs >= threshold).astype(int)
-                    fig_cm, ax_cm = plt.subplots(figsize=(4, 4))
-                    plot_confusion_matrix_ax(y_true, y_pred, ax_cm)
-                    st.subheader("Confusion Matrix (current threshold)")
-                    st.pyplot(fig_cm)
-
-                    # ROC
-                    fig_roc, ax_roc = plt.subplots(figsize=(5, 4))
-                    plot_roc_ax(model, messages, y_true, ax_roc)
-                    st.subheader("ROC Curve")
-                    st.pyplot(fig_roc)
-
-                    # Precision-Recall curve
-                    fig_pr, ax_pr = plt.subplots(figsize=(5, 4))
-                    plot_precision_recall_ax(model, messages, y_true, ax_pr)
-                    st.subheader("Precision-Recall Curve")
-                    st.pyplot(fig_pr)
-
-                    # Threshold sweep
-                    fig_ts, ax_ts = plt.subplots(figsize=(6, 3))
-                    plot_threshold_sweep_ax(probs, y_true, ax_ts)
-                    st.subheader("Threshold sweep (precision / recall / f1)")
-                    st.pyplot(fig_ts)
-                    # Also present threshold sweep as a table
-                    try:
-                        import pandas as pd
-                        thresholds = np.linspace(0.0, 1.0, 101)
-                        precisions = []
-                        recalls = []
-                        f1s = []
-                        from sklearn.metrics import precision_score, recall_score, f1_score
-                        for t in thresholds:
-                            y_pred_t = (probs >= t).astype(int)
-                            precisions.append(precision_score(y_true, y_pred_t, zero_division=0))
-                            recalls.append(recall_score(y_true, y_pred_t, zero_division=0))
-                            f1s.append(f1_score(y_true, y_pred_t, zero_division=0))
-
-                        table_df = pd.DataFrame({
-                            "threshold": thresholds,
-                            "precision": precisions,
-                            "recall": recalls,
-                            "f1": f1s,
-                        })
-                        st.subheader("Threshold table (showing ~10 rows around current threshold)")
-                        try:
-                            # show ~10 rows centered around the current slider threshold
-                            import math
-
-                            window = 10
-                            center_idx = int(round(threshold * 100))
-                            start = max(0, center_idx - window // 2)
-                            end = start + window
-                            # clamp end
-                            if end > len(table_df):
-                                end = len(table_df)
-                                start = max(0, end - window)
-
-                            display_df = table_df.iloc[start:end].reset_index(drop=True)
-                            st.dataframe(display_df)
-                            st.caption(f"Showing rows {start}–{end-1} (thresholds {display_df['threshold'].iloc[0]:.2f}–{display_df['threshold'].iloc[-1]:.2f})")
-                        except Exception:
-                            st.dataframe(table_df.head(10))
-                    except Exception:
-                        st.info("Unable to compute threshold table in this environment.")
-                else:
-                    st.info("Model does not provide probabilities; showing saved images if available.")
-                    show_image(CONF_MATRIX_PATH, "Confusion Matrix")
-                    show_image(ROC_PATH, "ROC Curve")
-
-    # Top Tokens by Class column
-    with col4:
-        st.header("Top Tokens by Class")
-        try:
-            df_tokens = df if 'df' in locals() and df is not None else load_data(download=False)
-        except Exception:
-            df_tokens = None
-
-        if df_tokens is None:
-            st.info("Top tokens require the dataset. Run training or provide data/CSV.")
-        else:
-            try:
-                from src.preprocessing import build_vectorizer
-                import numpy as _np
-                import pandas as _pd
-
-                vec = build_vectorizer()
-                X = vec.fit_transform(df_tokens["message"].astype(str).values)
-                feature_names = _np.array(vec.get_feature_names_out())
-                labels = df_tokens["label"].str.lower().values
-
-                def top_tokens_for_class(class_name, top_n=10):
-                    mask = labels == class_name
-                    if mask.sum() == 0:
-                        return []
-                    Xc = X[mask]
-                    scores = _np.asarray(Xc.sum(axis=0)).ravel()
-                    top_idx = scores.argsort()[::-1][:top_n]
-                    return list(zip(feature_names[top_idx], scores[top_idx]))
-
-                spam_top = top_tokens_for_class("spam", top_n=10)
-                ham_top = top_tokens_for_class("ham", top_n=10)
-
-                if spam_top:
-                    df_spam = _pd.DataFrame(spam_top, columns=["token", "score"])
-                    st.subheader("Spam — top tokens")
-                    st.table(df_spam)
-                else:
-                    st.info("No spam examples in dataset.")
-
-                if ham_top:
-                    df_ham = _pd.DataFrame(ham_top, columns=["token", "score"])
-                    st.subheader("Ham — top tokens")
-                    st.table(df_ham)
-                else:
-                    st.info("No ham examples in dataset.")
-            except Exception as e:
-                st.info(f"Unable to compute top tokens: {e}")
 
     st.markdown("---")
     st.caption("Dashboard: adjust the threshold on the left to see how metrics and the confusion matrix change.")
