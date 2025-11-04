@@ -196,7 +196,7 @@ def main():
     metrics = load_metrics()
     metadata = load_metadata()
 
-    col1, col2, col3 = st.columns([2, 2, 3])
+    col1, col2, col3, col4 = st.columns([2, 2, 3, 3])
 
     with col1:
         st.header("Predict a message")
@@ -225,6 +225,14 @@ def main():
         else:
             st.subheader("Dataset sample")
             st.write(df.sample(min(sample_size, len(df))))
+            # Class distribution (counts + bar chart)
+            try:
+                st.subheader("Class distribution")
+                class_counts = df["label"].str.lower().value_counts()
+                st.write(class_counts.to_frame(name="count"))
+                st.bar_chart(class_counts)
+            except Exception:
+                st.info("Unable to compute class distribution.")
 
     with col3:
         st.header("Model Performance")
@@ -319,6 +327,55 @@ def main():
                     st.info("Model does not provide probabilities; showing saved images if available.")
                     show_image(CONF_MATRIX_PATH, "Confusion Matrix")
                     show_image(ROC_PATH, "ROC Curve")
+
+    # Top Tokens by Class column
+    with col4:
+        st.header("Top Tokens by Class")
+        try:
+            df_tokens = df if 'df' in locals() and df is not None else load_data(download=False)
+        except Exception:
+            df_tokens = None
+
+        if df_tokens is None:
+            st.info("Top tokens require the dataset. Run training or provide data/CSV.")
+        else:
+            try:
+                from src.preprocessing import build_vectorizer
+                import numpy as _np
+                import pandas as _pd
+
+                vec = build_vectorizer()
+                X = vec.fit_transform(df_tokens["message"].astype(str).values)
+                feature_names = _np.array(vec.get_feature_names_out())
+                labels = df_tokens["label"].str.lower().values
+
+                def top_tokens_for_class(class_name, top_n=10):
+                    mask = labels == class_name
+                    if mask.sum() == 0:
+                        return []
+                    Xc = X[mask]
+                    scores = _np.asarray(Xc.sum(axis=0)).ravel()
+                    top_idx = scores.argsort()[::-1][:top_n]
+                    return list(zip(feature_names[top_idx], scores[top_idx]))
+
+                spam_top = top_tokens_for_class("spam", top_n=10)
+                ham_top = top_tokens_for_class("ham", top_n=10)
+
+                if spam_top:
+                    df_spam = _pd.DataFrame(spam_top, columns=["token", "score"])
+                    st.subheader("Spam — top tokens")
+                    st.table(df_spam)
+                else:
+                    st.info("No spam examples in dataset.")
+
+                if ham_top:
+                    df_ham = _pd.DataFrame(ham_top, columns=["token", "score"])
+                    st.subheader("Ham — top tokens")
+                    st.table(df_ham)
+                else:
+                    st.info("No ham examples in dataset.")
+            except Exception as e:
+                st.info(f"Unable to compute top tokens: {e}")
 
     st.markdown("---")
     st.caption("Dashboard: adjust the threshold on the left to see how metrics and the confusion matrix change.")
