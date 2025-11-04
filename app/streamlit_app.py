@@ -304,9 +304,9 @@ def main():
                     # numeric display
                     st.metric("Spam probability", f"{prob:.2%}")
 
-                    # small horizontal bar chart
+                    # small horizontal bar chart (color depends on predicted label)
                     fig_prob, ax_prob = plt.subplots(figsize=(6, 0.5))
-                    bar_color = "#d62728"  # use red for the probability bar
+                    bar_color = "#d62728" if label == "spam" else "#2ca02c"
                     ax_prob.barh([0], [prob], color=bar_color)
                     ax_prob.set_xlim(0, 1)
                     ax_prob.set_yticks([])
