@@ -211,18 +211,7 @@ def main():
                 st.markdown(f"**Prediction:** {label}")
                 if prob is not None:
                     st.write(f"Spam probability: {prob:.3f}")
-
-        st.markdown("---")
-        st.header("Model info")
-        if metadata:
-            st.subheader("Model metadata")
-            st.json(metadata)
-        else:
-            st.info("No metadata found. Consider generating metadata in training.")
-
-        if show_raw_metrics and metrics:
-            st.subheader("Saved metrics")
-            st.json(metrics)
+        # Model info removed per request — no metadata/metrics are shown here.
 
     with col2:
         st.header("Dataset")
