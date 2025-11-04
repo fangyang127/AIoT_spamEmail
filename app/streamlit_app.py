@@ -389,37 +389,43 @@ def main():
                         plt.tight_layout()
                         st.pyplot(fig_ts)
 
-                        # also show nearby table rows for inspection
-                        st.subheader("Threshold table (select range to display)")
+                        # Show a representative set of thresholds inside a user-selected range
+                        st.subheader("Threshold table (show 10 thresholds in selected range)")
                         try:
-                            # Allow user to choose how many rows to display (small window up to full table)
-                            # 101 rows corresponds to thresholds 0.00..1.00 at 0.01 steps
-                            table_rows = st.slider("Number of threshold rows to show", min_value=5, max_value=101, value=10, step=1)
+                            # allow user to pick a start/end range (defaults 0.30 -> 0.80)
+                            range_start, range_end = st.slider(
+                                "Select threshold range",
+                                0.0,
+                                1.0,
+                                (0.3, 0.8),
+                                step=0.01,
+                            )
 
-                            # If user requests the full table or a number >= available rows, show whole table
-                            total_rows = len(table_df)
-                            if table_rows >= total_rows:
-                                display_df = table_df.reset_index(drop=True)
-                                start = 0
-                                end = total_rows
-                            else:
-                                center_idx = int(round(threshold * 100))
-                                start = max(0, center_idx - table_rows // 2)
-                                end = start + table_rows
-                                if end > total_rows:
-                                    end = total_rows
-                                    start = max(0, end - table_rows)
-                                display_df = table_df.iloc[start:end].reset_index(drop=True)
+                            # Fixed to 10 thresholds per user's request; generate evenly spaced values
+                            n_points = 10
+                            selected_thresholds = np.linspace(range_start, range_end, n_points)
 
+                            # find nearest rows in table_df (table_df uses 0.00..1.00 step=0.01)
+                            arr = table_df["threshold"].to_numpy()
+                            idxs = [int(np.abs(arr - float(s)).argmin()) for s in selected_thresholds]
+
+                            # remove duplicates while preserving order (can happen when range small)
+                            seen = set()
+                            uniq_idxs = []
+                            for i in idxs:
+                                if i not in seen:
+                                    seen.add(i)
+                                    uniq_idxs.append(i)
+
+                            display_df = table_df.iloc[uniq_idxs].reset_index(drop=True)
                             st.dataframe(display_df)
-                            # friendly caption describing which thresholds are visible
                             if len(display_df) > 0:
-                                st.caption(f"Showing rows {start}–{end-1} (thresholds {display_df['threshold'].iloc[0]:.2f}–{display_df['threshold'].iloc[-1]:.2f})")
+                                st.caption(
+                                    f"Showing {len(display_df)} thresholds between {display_df['threshold'].iloc[0]:.2f}–{display_df['threshold'].iloc[-1]:.2f} (selected {n_points} points)")
                             else:
-                                st.caption("No threshold rows to display.")
+                                st.caption("No thresholds to display.")
                         except Exception as e:
-                            # fallback: show first 10 rows
-                            st.info(f"Unable to compute threshold table slice: {e}")
+                            st.info(f"Unable to compute selected threshold rows: {e}")
                             st.dataframe(table_df.head(10))
                     except Exception as e:
                         st.info(f"Unable to render threshold sweep plot: {e}")
