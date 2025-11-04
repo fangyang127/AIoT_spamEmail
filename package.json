@@ -1,15 +1,16 @@
+
 {
-  "name": "AIoT_spamEmail",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Spam SMS classifier project for AIoT course (OpenSpec + scikit-learn + Streamlit)",
-  "scripts": {
-    "spec:validate": "openspec validate"
-  },
-  "devDependencies": {
-    "@fission-ai/openspec": "0.14.0"
-  },
-  "engines": {
-    "node": ">=16"
-  }
+	"name": "AIoT_spamEmail",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Spam SMS classifier project for AIoT course (OpenSpec + scikit-learn + Streamlit)",
+	"scripts": {
+		"spec:validate": "openspec validate"
+	},
+	"devDependencies": {
+		"@fission-ai/openspec": "0.14.0"
+	},
+	"engines": {
+		"node": ">=16"
+	}
 }
