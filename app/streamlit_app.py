@@ -210,17 +210,58 @@ def main():
     except Exception:
         df_examples = None
 
-    # Determine example messages
+    # Determine example messages (clean sampled text to avoid garbled outputs)
     spam_example = "Free entry: claim your prize now"
     ham_example = "Hey, are we still on for tonight?"
+
+    def _clean_example_text(x: "any") -> str:
+        """Normalize and clean a candidate example message.
+
+        Returns empty string if the candidate is unsuitable.
+        """
+        try:
+            # handle bytes
+            if isinstance(x, (bytes, bytearray)):
+                x = x.decode("utf-8", errors="replace")
+            s = str(x)
+            # lightweight unicode normalization and control-char removal
+            import unicodedata, re
+
+            s = unicodedata.normalize("NFKC", s)
+            # remove C0/C1 control chars
+            s = re.sub(r"[\x00-\x1f\x7f-\x9f]+", " ", s)
+            # collapse whitespace
+            s = re.sub(r"\s+", " ", s).strip()
+            # require some minimal length and at least one alphanumeric or CJK char
+            if len(s) < 8:
+                return ""
+            if re.search(r"[A-Za-z0-9\u4e00-\u9fff]", s) is None:
+                return ""
+            # ensure ends with punctuation for nicer display
+            if s and s[-1] not in ".!?。！？":
+                s = s + "."
+            return s
+        except Exception:
+            return ""
+
     try:
         if df_examples is not None:
             s = df_examples[df_examples["label"].str.lower() == "spam"]
             h = df_examples[df_examples["label"].str.lower() == "ham"]
+
             if not s.empty:
-                spam_example = s.sample(1)["message"].iloc[0]
+                # prefer a cleaned, reasonably long example; fall back to longest cleaned
+                candidates = s["message"].astype(object).apply(_clean_example_text)
+                candidates = candidates[candidates != ""]
+                if not candidates.empty:
+                    # choose the longest cleaned example for readability
+                    spam_example = candidates.loc[candidates.str.len().idxmax()]
+
             if not h.empty:
-                ham_example = h.sample(1)["message"].iloc[0]
+                candidates = h["message"].astype(object).apply(_clean_example_text)
+                candidates = candidates[candidates != ""]
+                if not candidates.empty:
+                    ham_example = candidates.loc[candidates.str.len().idxmax()]
     except Exception:
         # keep defaults on failure
         pass
