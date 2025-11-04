@@ -55,6 +55,7 @@ def main():
     import streamlit as st
     from joblib import load
     import os
+    import sys
     import json
     import matplotlib.pyplot as plt
     import numpy as np
@@ -67,6 +68,12 @@ def main():
         ConfusionMatrixDisplay,
         RocCurveDisplay,
     )
+
+    # Ensure repository root is on sys.path so `from src...` imports work on Streamlit Cloud
+    # app/streamlit_app.py lives in <repo>/app/ ; repo root is one level up
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
 
     from src.data_loader import load_data
 
