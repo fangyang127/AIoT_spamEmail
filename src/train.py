@@ -49,6 +49,29 @@ def train_smoke(output_dir: str = "models", test_size: float = 0.2):
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
 
+    # Save metadata describing the model and training run
+    try:
+        import sklearn
+        from datetime import datetime
+
+        metadata = {
+            "model_name": "logistic",
+            "model_version": "v0.1",
+            "model_path": os.path.basename(model_path),
+            "pipeline_steps": [name for name, _ in pipe.steps],
+            "train_date": datetime.utcnow().isoformat() + "Z",
+            "train_size": int(len(X_train)),
+            "test_size": int(len(X_test)),
+            "sklearn_version": sklearn.__version__,
+            "metrics": metrics,
+        }
+        metadata_path = os.path.join(output_dir, "metadata.json")
+        with open(metadata_path, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2)
+        print(f"Saved metadata to {metadata_path}")
+    except Exception as e:
+        print(f"Failed to write metadata: {e}")
+
     print(f"Saved model to {model_path}")
     print(f"Saved metrics to {metrics_path}")
     # Save evaluation plots
