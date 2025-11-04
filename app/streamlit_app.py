@@ -247,10 +247,13 @@ def main():
     if df_tokens is None:
         st.info("Top tokens require the dataset. Run training or provide data/CSV.")
     else:
+        # allow user to choose Top-N
+        top_n = st.slider("Top N tokens", min_value=1, max_value=30, value=10, step=1)
         try:
             from src.preprocessing import build_vectorizer
             import numpy as _np
             import pandas as _pd
+            import matplotlib.pyplot as _plt
 
             vec = build_vectorizer()
             X = vec.fit_transform(df_tokens["message"].astype(str).values)
@@ -260,28 +263,43 @@ def main():
             def top_tokens_for_class(class_name, top_n=10):
                 mask = labels == class_name
                 if mask.sum() == 0:
-                    return []
+                    return _pd.DataFrame(columns=["token", "score"])
                 Xc = X[mask]
                 scores = _np.asarray(Xc.sum(axis=0)).ravel()
                 top_idx = scores.argsort()[::-1][:top_n]
-                return list(zip(feature_names[top_idx], scores[top_idx]))
+                return _pd.DataFrame({"token": feature_names[top_idx], "score": scores[top_idx]})
 
-            spam_top = top_tokens_for_class("spam", top_n=10)
-            ham_top = top_tokens_for_class("ham", top_n=10)
+            df_spam = top_tokens_for_class("spam", top_n=top_n)
+            df_ham = top_tokens_for_class("ham", top_n=top_n)
 
-            if spam_top:
-                df_spam = _pd.DataFrame(spam_top, columns=["token", "score"])
-                st.subheader("Spam — top tokens")
-                st.table(df_spam)
-            else:
-                st.info("No spam examples in dataset.")
+            col_spam, col_ham = st.columns(2)
+            with col_spam:
+                st.subheader(f"Spam — top {top_n} tokens")
+                if df_spam.empty:
+                    st.info("No spam examples in dataset.")
+                else:
+                    # horizontal bar chart, largest on top
+                    fig, ax = _plt.subplots(figsize=(6, max(2, 0.3 * top_n)))
+                    ax.barh(df_spam["token"][::-1], df_spam["score"][::-1], color="#d62728")
+                    ax.set_xlabel("TF-IDF total score")
+                    ax.set_ylabel("Token")
+                    ax.set_title("Spam tokens")
+                    _plt.tight_layout()
+                    st.pyplot(fig)
 
-            if ham_top:
-                df_ham = _pd.DataFrame(ham_top, columns=["token", "score"])
-                st.subheader("Ham — top tokens")
-                st.table(df_ham)
-            else:
-                st.info("No ham examples in dataset.")
+            with col_ham:
+                st.subheader(f"Ham — top {top_n} tokens")
+                if df_ham.empty:
+                    st.info("No ham examples in dataset.")
+                else:
+                    fig2, ax2 = _plt.subplots(figsize=(6, max(2, 0.3 * top_n)))
+                    ax2.barh(df_ham["token"][::-1], df_ham["score"][::-1], color="#1f77b4")
+                    ax2.set_xlabel("TF-IDF total score")
+                    ax2.set_ylabel("Token")
+                    ax2.set_title("Ham tokens")
+                    _plt.tight_layout()
+                    st.pyplot(fig2)
+
         except Exception as e:
             st.info(f"Unable to compute top tokens: {e}")
 
