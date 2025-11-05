@@ -261,15 +261,34 @@ def main():
                 candidates = h["message"].astype(object).apply(_clean_example_text)
                 candidates = candidates[candidates != ""]
                 if not candidates.empty:
-                    # Prefer a shorter, readable ham example for brevity in the UI.
-                    # Choose the shortest candidate up to a max length; otherwise fall back to the longest cleaned example.
-                    max_short_len = 40
-                    short_candidates = candidates[candidates.str.len() <= max_short_len]
-                    if not short_candidates.empty:
-                        ham_example = short_candidates.loc[short_candidates.str.len().idxmin()]
+                    # Prefer a "complete sentence" candidate for ham examples.
+                    # Define complete sentence as: at least min_chars and at least min_words,
+                    # and (we already ensured a trailing punctuation in _clean_example_text).
+                    min_chars = 20
+                    min_words = 3
+                    def _is_full_sentence(s: str) -> bool:
+                        if not s:
+                            return False
+                        if len(s) < min_chars:
+                            return False
+                        # count words (split on whitespace)
+                        if len(s.split()) < min_words:
+                            return False
+                        return True
+
+                    full_candidates = candidates[candidates.apply(_is_full_sentence)]
+                    if not full_candidates.empty:
+                        # choose the shortest full sentence so it's concise but complete
+                        ham_example = full_candidates.loc[full_candidates.str.len().idxmin()]
                     else:
-                        # no short candidate — pick the longest cleaned example so it's still readable
-                        ham_example = candidates.loc[candidates.str.len().idxmax()]
+                        # If no full sentences found, prefer a moderately short cleaned example
+                        max_short_len = 60
+                        short_candidates = candidates[candidates.str.len() <= max_short_len]
+                        if not short_candidates.empty:
+                            ham_example = short_candidates.loc[short_candidates.str.len().idxmin()]
+                        else:
+                            # fallback: pick the longest cleaned example for readability
+                            ham_example = candidates.loc[candidates.str.len().idxmax()]
     except Exception:
         # keep defaults on failure
         pass
