@@ -261,7 +261,15 @@ def main():
                 candidates = h["message"].astype(object).apply(_clean_example_text)
                 candidates = candidates[candidates != ""]
                 if not candidates.empty:
-                    ham_example = candidates.loc[candidates.str.len().idxmax()]
+                    # Prefer a shorter, readable ham example for brevity in the UI.
+                    # Choose the shortest candidate up to a max length; otherwise fall back to the longest cleaned example.
+                    max_short_len = 40
+                    short_candidates = candidates[candidates.str.len() <= max_short_len]
+                    if not short_candidates.empty:
+                        ham_example = short_candidates.loc[short_candidates.str.len().idxmin()]
+                    else:
+                        # no short candidate — pick the longest cleaned example so it's still readable
+                        ham_example = candidates.loc[candidates.str.len().idxmax()]
     except Exception:
         # keep defaults on failure
         pass
