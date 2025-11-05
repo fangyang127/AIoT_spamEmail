@@ -174,7 +174,7 @@ def main():
         RocCurveDisplay,
     )
 
-    st.set_page_config(page_title="Spam SMS Classifier", layout="wide")
+    st.set_page_config(page_title="Spam/Ham Classifier", layout="wide")
     # Sidebar controls
     st.sidebar.title("Controls")
     threshold = st.sidebar.slider("Prediction threshold", 0.0, 1.0, 0.5, 0.01)
