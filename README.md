@@ -2,6 +2,10 @@
 
 這個專案實作從資料載入、前處理、模型訓練到互動式視覺化的完整流程。專案使用 scikit-learn（TF-IDF + LogisticRegression）訓練一個簡單的二分類文字模型，並使用 Streamlit 展示預測、分析與評估結果。
 
+**Source Reference:** https://github.com/PacktPublishing/Hands-On-Artificial-Intelligence-for-Cybersecurity.git
+
+**Demo Site:** https://aiotspamemail-fang.streamlit.app/
+
 ## 主要功能
 
 - 可重現的訓練流程（`src/train.py`）會輸出模型與評估檔到 `models/`
