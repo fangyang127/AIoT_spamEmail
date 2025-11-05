@@ -1,25 +1,6 @@
 # Spam/Ham Classifier
 
-一個簡潔的教學專案：使用 scikit-learn 訓練一個簡易的 Spam/Ham（二分類）文字分類器，並以 Streamlit 提供互動式展示與分析介面。
-
-主要特性
-- 以 TF-IDF + LogisticRegression 建立的 scikit-learn Pipeline
-- 訓練腳本會輸出模型（`.joblib`）、評估指標（`metrics.json`）與圖表到 `models/`
-- Streamlit Dashboard（`app/streamlit_app.py`）：即時預測、範例填入、機率顯示、混淆矩陣、ROC/PR 與 threshold sweep
-- OpenSpec 資料夾（`openspec/`）包含專案規格與變更提案範例
-
-快速開始（Windows PowerShell）
-
-1) 建議建立並啟用虛擬環境
-
-# Spam/Ham Classifier
-
-這是一個教學 / 示範專案，實作從資料載入、前處理、模型訓練到互動式視覺化的完整流程。專案使用 scikit-learn（TF-IDF + LogisticRegression）訓練一個簡單的二分類文字模型，並使用 Streamlit 展示預測、分析與評估結果。
-
-## 目標讀者
-
-- 想快速上手文字分類與展示的學生或工程師
-- 希望了解從訓練到 Deployment（Streamlit）流程的開發者
+這個專案實作從資料載入、前處理、模型訓練到互動式視覺化的完整流程。專案使用 scikit-learn（TF-IDF + LogisticRegression）訓練一個簡單的二分類文字模型，並使用 Streamlit 展示預測、分析與評估結果。
 
 ## 主要功能
 
